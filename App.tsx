@@ -117,12 +117,12 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-zinc-900 text-gray-100 font-sans p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
         <header className="text-center mb-10">
-          <h1 className="text-4xl sm:text-5xl font-bold tracking-tighter text-white">
-              Editor IA para <span className="font-bold text-brand-primary">falabella.</span>
-          </h1>
-          <p className="mt-3 text-lg text-gray-400 max-w-2xl mx-auto">
-              Transforma tus imágenes de producto en fotografías profesionales con IA.
-          </p>
+            <h1 className="text-5xl sm:text-6xl font-bold tracking-tighter text-white">
+              Flux <span className="text-brand-primary">IA</span>
+            </h1>
+            <p className="mt-4 text-lg text-gray-400 max-w-2xl mx-auto">
+                Transforma tus imágenes de producto en fotografías profesionales con IA.
+            </p>
         </header>
 
         <main className="grid grid-cols-1 lg:grid-cols-2 gap-8">
