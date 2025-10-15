@@ -121,7 +121,7 @@ const App: React.FC = () => {
               Flux <span className="text-brand-primary">IA</span>
             </h1>
             <p className="mt-4 text-lg text-gray-400 max-w-2xl mx-auto">
-                Transforma tus imágenes de producto en fotografías profesionales con IA.
+                Transforma tus imágenes de producto Falabella en fotografías profesionales IA.
             </p>
         </header>
 
