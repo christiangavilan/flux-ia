@@ -1,0 +1,5 @@
+{
+  "name": "Editor IA imágenes Falabella",
+  "description": "An AI-powered tool for e-commerce that takes user-uploaded product images, removes the background, places them on a new generated background, applies professional lighting styles, and allows for refinements.",
+  "requestFramePermissions": []
+}
