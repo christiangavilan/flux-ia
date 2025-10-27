@@ -1,8 +1,6 @@
-
 export type BackgroundType = 'pure_white' | 'neutral_gray' | 'themed' | 'automatic';
-export type LightingStyle = 'sharp' | 'soft';
+export type LightingStyle = 'soft' | 'sharp';
 export type AspectRatio = '1:1' | '4:5' | '16:9';
-export type OutputSize = '2k' | '4k';
 export type ProductView = 'original' | 'enhanced';
 
 export interface GenerationConfig {
@@ -10,11 +8,12 @@ export interface GenerationConfig {
   backgroundKeywords: string;
   lightingStyle: LightingStyle;
   aspectRatio: AspectRatio;
-  outputSize: OutputSize;
   productView: ProductView;
+  addReflection: boolean;
+  separateProducts: boolean;
+  productSeparation: number;
 }
 
-// FIX: Add Preset type.
 export interface Preset {
   name: string;
   config: GenerationConfig;

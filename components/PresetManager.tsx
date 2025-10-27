@@ -38,7 +38,7 @@ const PresetManager: React.FC<PresetManagerProps> = ({ presets, onSave, onLoad, 
           className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-sm text-gray-300 rounded-md transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           aria-label="Guardar preajuste actual"
         >
-          <SaveIcon className="w-4 h-4" />
+          <SaveIcon className="w-4 h-4 pointer-events-none" />
           <span>Guardar Actual</span>
         </button>
       </div>

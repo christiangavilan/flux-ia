@@ -1,5 +1,5 @@
 {
   "name": "Flux IA",
-  "description": "Flux IA is an AI-powered tool for e-commerce that takes user-uploaded product images, removes the background, places them on a new generated background, applies professional lighting styles, and allows for refinements.",
+  "description": "Flux IA, una herramienta de e-commerce impulsada por IA, procesa imágenes de productos: elimina el fondo, las coloca en un fondo generado, aplica estilos de iluminación profesionales y ofrece opciones de ajuste fino.",
   "requestFramePermissions": []
 }
