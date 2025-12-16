@@ -1,13 +1,73 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import type { GenerationConfig, UploadedFile, Preset } from './types';
+
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import type { GenerationConfig, UploadedFile } from './types';
 import ControlPanel from './components/ControlPanel';
 import GeneratedImage from './components/GeneratedImage';
-import PresetManager from './components/PresetManager';
-import { SparklesIcon, CloseIcon, SpinnerIcon } from './components/icons';
-import { generateProductImage, refineProductImage } from './services/geminiService';
+import { SparklesIcon, CloseIcon, SpinnerIcon, SunIcon, ContrastIcon, ShadowIcon, SharpnessIcon, MagicWandIcon } from './components/icons';
+import { generateProductImage, refineProductImage, enhancePrompt } from './services/geminiService';
 
 const MAX_CONCURRENT_REQUESTS = 3; // Límite de solicitudes simultáneas a la API
-const PRESETS_STORAGE_KEY = 'flux-ia-presets';
+
+// Componente auxiliar para manejar el Hover largo (2 segundos)
+interface QuickRefineBtnProps {
+  label: string;
+  command: string;
+  icon: React.ElementType;
+  description: string;
+  onClick: (cmd: string) => void;
+  disabled: boolean;
+  isProcessing: boolean;
+}
+
+const QuickRefineBtn: React.FC<QuickRefineBtnProps> = ({ label, command, icon: Icon, description, onClick, disabled, isProcessing }) => {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleMouseEnter = () => {
+    if (disabled) return;
+    // Esperar 2 segundos (2000ms) antes de mostrar el tooltip
+    timerRef.current = setTimeout(() => {
+      setShowTooltip(true);
+    }, 2000);
+  };
+
+  const handleMouseLeave = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    setShowTooltip(false);
+  };
+
+  const handleClick = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setShowTooltip(false);
+    onClick(command);
+  };
+
+  return (
+    <div className="relative group" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+      <button
+          onClick={handleClick}
+          disabled={disabled}
+          className="w-full group flex flex-col sm:flex-row items-center justify-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 hover:border-zinc-500 rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+          {isProcessing ? (
+              <SpinnerIcon className="w-4 h-4 text-brand-primary" />
+          ) : (
+              <Icon className="w-4 h-4 text-zinc-400 group-hover:text-brand-primary transition-colors" />
+          )}
+          <span className="text-xs font-medium text-gray-300 group-hover:text-white">{label}</span>
+      </button>
+      
+      {/* Tooltip con animación */}
+      <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[180px] px-3 py-2 bg-zinc-900 border border-zinc-600 text-gray-200 text-xs rounded-md shadow-xl z-20 pointer-events-none transition-all duration-300 ${showTooltip ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1'}`}>
+          {description}
+          <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-zinc-600"></div>
+      </div>
+    </div>
+  );
+};
 
 const App: React.FC = () => {
   const [config, setConfig] = useState<GenerationConfig>({
@@ -19,6 +79,7 @@ const App: React.FC = () => {
     addReflection: false,
     separateProducts: false,
     productSeparation: 50,
+    backgroundBlur: 0,
   });
   const [uploadedImages, setUploadedImages] = useState<UploadedFile[]>([]);
   const [generatedImages, setGeneratedImages] = useState<string[] | null>(null); // For selection view
@@ -27,34 +88,23 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [refinementCommand, setRefinementCommand] = useState<string>('');
+  const [isEnhancingRefinePrompt, setIsEnhancingRefinePrompt] = useState(false);
   const [activeRequests, setActiveRequests] = useState(0);
-  const [presets, setPresets] = useState<Preset[]>([]);
   const [processingQuickRefine, setProcessingQuickRefine] = useState<string | null>(null);
-
-  // State for new preset management UI
-  const [isSavePresetModalOpen, setIsSavePresetModalOpen] = useState(false);
-  const [presetNameInput, setPresetNameInput] = useState('');
   const [toast, setToast] = useState<{ message: string; id: number } | null>(null);
 
 
   // --- Effects ---
-  useEffect(() => {
-    try {
-      const storedPresets = localStorage.getItem(PRESETS_STORAGE_KEY);
-      if (storedPresets) {
-        setPresets(JSON.parse(storedPresets));
-      }
-    } catch (e) {
-      console.error("Failed to load presets from localStorage", e);
-    }
-  }, []);
-  
   useEffect(() => {
     if (toast) {
       const timer = setTimeout(() => setToast(null), 3000);
       return () => clearTimeout(timer);
     }
   }, [toast]);
+
+  const handleShowToast = useCallback((message: string) => {
+      setToast({ message, id: Date.now() });
+  }, []);
 
   const activeImage = activeImageIndex !== null ? imageHistory[activeImageIndex] : null;
   const isAtConcurrencyLimit = activeRequests >= MAX_CONCURRENT_REQUESTS;
@@ -69,6 +119,7 @@ const App: React.FC = () => {
     setGeneratedImages(null);
     setImageHistory([]);
     setActiveImageIndex(null);
+    setRefinementCommand(''); // Reset refinement command on new generation
 
     try {
       const results = await generateProductImage(uploadedImages, config);
@@ -125,11 +176,27 @@ const App: React.FC = () => {
     }
   }, [refinementCommand, executeRefinement]);
 
+  const handleEnhanceRefinePrompt = async () => {
+    const currentText = refinementCommand.trim();
+    if (!currentText || isEnhancingRefinePrompt || isLoading) return;
+
+    setIsEnhancingRefinePrompt(true);
+    try {
+        const enhancedText = await enhancePrompt(currentText, 'refinement');
+        setRefinementCommand(enhancedText);
+    } catch (error) {
+        console.error("Failed to enhance refine prompt", error);
+    } finally {
+        setIsEnhancingRefinePrompt(false);
+    }
+  };
+
   const handleQuickRefine = useCallback(async (command: string) => {
     setProcessingQuickRefine(command);
     await executeRefinement(command);
     setProcessingQuickRefine(null);
   }, [executeRefinement]);
+
 
   // --- Image Selection Logic ---
   const handleSelectImage = (image: string) => {
@@ -160,62 +227,32 @@ const App: React.FC = () => {
     setError(null);
 }, []);
 
-  // --- Preset Management ---
-  const showToast = useCallback((message: string) => { setToast({ message, id: Date.now() }); }, []);
-  
-  const updatePresets = useCallback((newPresets: Preset[]) => {
-    setPresets(newPresets);
-    localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(newPresets));
-  }, []);
-  
-  const handleSavePreset = () => { setIsSavePresetModalOpen(true); };
-  
-  const confirmAndSavePreset = useCallback(() => {
-    const name = presetNameInput.trim();
-    if (!name) return;
-
-    const newPreset: Preset = { name, config };
-    const existingIndex = presets.findIndex(p => p.name.toLowerCase() === name.toLowerCase());
-    let updatedPresets;
-
-    if (existingIndex > -1) {
-        if (!window.confirm(`Ya existe un preajuste con el nombre "${name}". ¿Quieres sobrescribirlo?`)) {
-            return;
-        }
-        updatedPresets = [...presets];
-        updatedPresets[existingIndex] = newPreset;
-    } else {
-        updatedPresets = [...presets, newPreset];
-    }
-    
-    updatePresets(updatedPresets.sort((a, b) => a.name.localeCompare(b.name)));
-    showToast(`Preajuste "${name}" guardado.`);
-    setIsSavePresetModalOpen(false);
-    setPresetNameInput('');
-  }, [presetNameInput, presets, config, updatePresets, showToast]);
-
-  const handleLoadPreset = useCallback((name: string) => {
-    const preset = presets.find(p => p.name === name);
-    if (preset) {
-      setConfig(preset.config);
-      showToast(`Preajuste "${name}" cargado.`);
-    }
-  }, [presets, showToast]);
-
-  const handleDeletePreset = useCallback((name: string) => {
-    if (window.confirm(`¿Estás seguro de que quieres eliminar el preajuste "${name}"?`)) {
-      const updatedPresets = presets.filter(p => p.name !== name);
-      updatePresets(updatedPresets);
-      showToast(`Preajuste "${name}" eliminado.`);
-    }
-  }, [presets, updatePresets, showToast]);
-  
   // --- UI Variables ---
   const quickRefinements = [
-    { label: '+ Brillo', command: 'increase brightness slightly' },
-    { label: '+ Contraste', command: 'increase contrast subtly' },
-    { label: 'Añadir Sombra', command: 'add a soft, realistic shadow under the product' },
-    { label: 'Más Nitidez', command: 'increase sharpness slightly' },
+    { 
+        label: 'Iluminar', 
+        command: 'increase brightness slightly', 
+        icon: SunIcon,
+        description: 'Sube la exposición global para una imagen más clara.'
+    },
+    { 
+        label: 'Contraste', 
+        command: 'increase contrast subtly', 
+        icon: ContrastIcon,
+        description: 'Aumenta la diferencia entre luces y sombras.' 
+    },
+    { 
+        label: 'Sombra', 
+        command: 'add a soft, realistic shadow under the product', 
+        icon: ShadowIcon,
+        description: 'Añade una sombra de contacto realista bajo el producto.' 
+    },
+    { 
+        label: 'Nitidez', 
+        command: 'increase sharpness slightly', 
+        icon: SharpnessIcon,
+        description: 'Mejora el enfoque y los detalles de los bordes.' 
+    },
   ];
   
   const generateButtonDisabled = isLoading || uploadedImages.length === 0 || isAtConcurrencyLimit;
@@ -225,7 +262,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-zinc-900 text-gray-100 font-sans p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
-        <header className="text-center mb-10">
+        <header className="text-center mb-10 animate-fade-in-down">
             <h1 className="text-5xl sm:text-6xl font-bold tracking-tighter text-white">
               Flux <span className="text-brand-primary">IA</span>
             </h1>
@@ -235,24 +272,35 @@ const App: React.FC = () => {
         </header>
 
         <main className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-zinc-800/50 p-6 rounded-xl shadow-lg flex flex-col gap-8">
+          {/* Left Panel: Configuration & Generation */}
+          <div className="bg-zinc-800/50 p-6 rounded-xl shadow-lg flex flex-col gap-8 h-fit animate-slide-up animate-delay-100">
             <ControlPanel
               config={config}
               setConfig={setConfig}
               isLoading={isLoading || isAtConcurrencyLimit}
               uploadedImagesCount={uploadedImages.length}
             />
-            <hr className="border-zinc-700" />
-            <PresetManager
-              presets={presets}
-              onSave={handleSavePreset}
-              onLoad={handleLoadPreset}
-              onDelete={handleDeletePreset}
-              isLoading={isLoading}
-            />
+            
+            {/* Generate Button Moved Here */}
+            <div className="relative group w-full pt-4 border-t border-zinc-700">
+                 <button
+                    onClick={handleGenerate}
+                    disabled={generateButtonDisabled}
+                    className="w-full bg-brand-primary hover:bg-brand-primary-hover disabled:bg-zinc-600 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-brand-primary/20 hover:-translate-y-0.5"
+                >
+                    <SparklesIcon className="w-5 h-5" />
+                    {isAtConcurrencyLimit ? 'Procesando otras solicitudes...' : 'Generar Imagen'}
+                </button>
+                 {!isLoading && generateButtonDisabled && (
+                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-3 py-1 bg-zinc-600 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                      {uploadedImages.length === 0 ? "Sube al menos una imagen para empezar" : isAtConcurrencyLimit ? `Límite de ${MAX_CONCURRENT_REQUESTS} solicitudes. Intenta en un momento.` : ''}
+                   </div>
+                 )}
+            </div>
           </div>
 
-          <div className="flex flex-col gap-6">
+          {/* Right Panel: Results & Refinement */}
+          <div className="flex flex-col gap-6 animate-slide-up animate-delay-200">
             <div className="bg-zinc-800/50 p-6 rounded-xl shadow-lg flex-grow flex flex-col justify-center">
               <GeneratedImage
                 generatedImages={generatedImages}
@@ -268,40 +316,43 @@ const App: React.FC = () => {
                 aspectRatio={config.aspectRatio}
                 onCancelSelection={handleCancelSelection}
                 onGoBackToSelection={handleGoBackToSelection}
+                onShowToast={handleShowToast}
               />
             </div>
+            
+            {/* Refinement Section */}
             <div className="bg-zinc-800/50 p-6 rounded-xl shadow-lg space-y-4">
-              <div className="relative group w-full">
-                 <button
-                    onClick={handleGenerate}
-                    disabled={generateButtonDisabled}
-                    className="w-full bg-brand-primary hover:bg-brand-primary-hover disabled:bg-zinc-600 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-all"
-                >
-                    <SparklesIcon className="w-5 h-5" />
-                    {isAtConcurrencyLimit ? 'Procesando otras solicitudes...' : 'Generar Imagen'}
-                </button>
-                 {!isLoading && generateButtonDisabled && (
-                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-3 py-1 bg-zinc-600 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                      {uploadedImages.length === 0 ? "Sube al menos una imagen para empezar" : isAtConcurrencyLimit ? `Límite de ${MAX_CONCURRENT_REQUESTS} solicitudes. Intenta en un momento.` : ''}
-                   </div>
-                 )}
-              </div>
               <div>
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <input
-                      type="text"
-                      value={refinementCommand}
-                      onChange={(e) => setRefinementCommand(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleRefine()}
-                      placeholder='ej. "hazlo más oscuro", "mueve a la derecha"'
-                      disabled={refineButtonDisabled}
-                      className="flex-grow bg-zinc-700 border-zinc-600 rounded-md px-3 py-2 text-sm placeholder-gray-400 focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-all disabled:opacity-50"
-                  />
-                  <div className="relative group sm:w-auto">
+                <div className="flex flex-col gap-3">
+                  <div className="relative flex-grow group">
+                      <textarea
+                          value={refinementCommand}
+                          onChange={(e) => setRefinementCommand(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleRefine();
+                            }
+                          }}
+                          placeholder='ej. "hazlo más oscuro", "mueve a la derecha"'
+                          disabled={refineButtonDisabled || isEnhancingRefinePrompt}
+                          rows={2} // Changed from 3 to 2
+                          className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 pr-10 text-sm text-gray-200 placeholder-gray-600 focus:ring-1 focus:ring-brand-primary focus:border-brand-primary transition-all disabled:opacity-50 resize-none"
+                      />
+                      <button
+                        onClick={handleEnhanceRefinePrompt}
+                        disabled={!refinementCommand.trim() || isLoading || isEnhancingRefinePrompt || refineButtonDisabled}
+                        className="absolute bottom-2 right-2 p-1.5 text-gray-400 hover:text-brand-primary bg-zinc-800/80 hover:bg-zinc-900 border border-zinc-600 hover:border-brand-primary/50 rounded transition-all shadow-sm disabled:opacity-0 backdrop-blur-sm"
+                        title="Mejorar instrucción con IA"
+                    >
+                        {isEnhancingRefinePrompt ? <SpinnerIcon className="w-4 h-4" /> : <MagicWandIcon className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <div className="relative group w-full">
                     <button
                         onClick={handleRefine}
                         disabled={refineTextInputDisabled}
-                        className="w-full sm:w-auto bg-zinc-700 hover:bg-zinc-600 disabled:bg-zinc-800 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-lg transition-all"
+                        className="w-full bg-zinc-700 hover:bg-zinc-600 disabled:bg-zinc-800 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-lg transition-all"
                     >
                         Refinar
                     </button>
@@ -313,18 +364,22 @@ const App: React.FC = () => {
                   </div>
                 </div>
                 {activeImage && (
-                  <div className="flex flex-wrap gap-2 pt-3">
-                      <p className="text-xs text-gray-400 w-full mb-1">Ajustes rápidos:</p>
-                      {quickRefinements.map(({ label, command }) => (
-                          <button
-                              key={label}
-                              onClick={() => handleQuickRefine(command)}
-                              disabled={refineButtonDisabled}
-                              className="px-3 py-1 bg-zinc-700 hover:bg-zinc-600 text-sm text-gray-300 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center w-24"
-                          >
-                              {processingQuickRefine === command ? <SpinnerIcon className="w-4 h-4 text-zinc-400" /> : label}
-                          </button>
-                      ))}
+                   <div className="pt-4">
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Ajustes rápidos</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          {quickRefinements.map(({ label, command, icon, description }) => (
+                              <QuickRefineBtn
+                                key={label}
+                                label={label}
+                                command={command}
+                                icon={icon}
+                                description={description}
+                                onClick={handleQuickRefine}
+                                disabled={refineButtonDisabled}
+                                isProcessing={processingQuickRefine === command}
+                              />
+                          ))}
+                      </div>
                   </div>
                 )}
               </div>
@@ -337,40 +392,6 @@ const App: React.FC = () => {
             </p>
         </footer>
       </div>
-
-      {/* Save Preset Modal */}
-      {isSavePresetModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setIsSavePresetModalOpen(false)}>
-          <div className="bg-zinc-800 rounded-lg shadow-xl p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-white mb-4">Guardar Preajuste</h3>
-            <p className="text-sm text-gray-400 mb-4">Ingresa un nombre para guardar la configuración actual.</p>
-            <input
-              type="text"
-              value={presetNameInput}
-              onChange={(e) => setPresetNameInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && confirmAndSavePreset()}
-              placeholder="Ej. 'Zapatillas fondo blanco'"
-              autoFocus
-              className="w-full bg-zinc-700 border-zinc-600 rounded-md px-3 py-2 text-sm placeholder-gray-400 focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-all"
-            />
-            <div className="flex justify-end gap-3 mt-5">
-              <button
-                onClick={() => { setIsSavePresetModalOpen(false); setPresetNameInput(''); }}
-                className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-sm text-gray-300 rounded-md transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmAndSavePreset}
-                disabled={!presetNameInput.trim()}
-                className="px-4 py-2 bg-brand-primary hover:bg-brand-primary-hover text-sm text-white font-semibold rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Guardar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Toast Notification */}
       {toast && (

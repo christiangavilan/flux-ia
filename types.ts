@@ -1,3 +1,4 @@
+
 export type BackgroundType = 'pure_white' | 'neutral_gray' | 'themed' | 'automatic';
 export type LightingStyle = 'soft' | 'sharp';
 export type AspectRatio = '1:1' | '4:5' | '16:9';
@@ -12,15 +13,16 @@ export interface GenerationConfig {
   addReflection: boolean;
   separateProducts: boolean;
   productSeparation: number;
-}
-
-export interface Preset {
-  name: string;
-  config: GenerationConfig;
+  backgroundBlur: number;
 }
 
 export interface UploadedFile {
   base64: string;
   name: string;
   type: string;
+}
+
+export interface Preset {
+  name: string;
+  config: GenerationConfig;
 }

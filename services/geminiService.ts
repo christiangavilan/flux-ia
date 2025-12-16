@@ -1,11 +1,13 @@
+
 import { GoogleGenAI, Modality } from "@google/genai";
 import type { GenerationConfig, UploadedFile } from '../types';
 
-if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable not set");
-}
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const getClient = () => {
+    if (!process.env.API_KEY) {
+        throw new Error("API_KEY environment variable not set");
+    }
+    return new GoogleGenAI({ apiKey: process.env.API_KEY });
+};
 
 const base64ToGenerativePart = (base64: string, mimeType: string) => {
     return {
@@ -19,41 +21,52 @@ const base64ToGenerativePart = (base64: string, mimeType: string) => {
 const getRoleInstructions = (config: GenerationConfig): string => {
     const { lightingStyle } = config;
 
-    const lightingStyleDescription = lightingStyle === 'sharp' ? "'Nítida y Enérgica'" : "'Suave y Uniforme'";
+    // MODIFICACIÓN CRÍTICA: Se eliminaron las palabras "reflector", "softbox", "paraguas".
+    // Se enfatiza "FUENTE INVISIBLE" para evitar que la IA dibuje el equipo.
+    const lightingStyleDescription = lightingStyle === 'sharp' 
+        ? "Simula una luz dura y direccional (Hard Light) proveniente de una fuente INVISIBLE y FUERA DE CAMPO. La luz debe golpear el producto directamente. Objetivo: Sombras definidas, alto micro-contraste, texturas resaltadas."
+        : "Simula una luz difusa y envolvente (Soft Light) proveniente de grandes paneles difusores INVISIBLES y FUERA DE CAMPO. La luz debe abrazar el producto. Objetivo: Sombras muy suaves, transiciones tonales graduales, look Premium.";
 
     return `
-# INSTRUCCIONES DE IDENTIDAD Y ROLES PROFESIONALES (MANDATORIO)
+# CONSTITUCIÓN DE FLUX IA (REGLAS DE ORO INVIOLABLES)
 
-Tu identidad se compone de múltiples roles profesionales. Debes fusionar las responsabilidades de cada perfil para garantizar que el resultado final cumpla con los estándares de la más alta calidad en e-commerce y publicidad.
+Como Jefe de Producción de Flux IA, estás sometido a las siguientes LEYES SUPREMAS. Cualquier desviación resultará en una falla del sistema:
+
+### 🛡️ ARTÍCULO 1: INTEGRIDAD DEL PRODUCTO (EL HÉROE)
+*   **MANDATO:** El producto es sagrado. Debe representarse con fidelidad absoluta.
+*   **PROHIBICIONES:** Queda terminantemente PROHIBIDO alterar logos, tipografías, costuras, patrones, texturas o proporciones geométricas del producto original.
+*   **ROL:** Eres un fotógrafo documental del producto, NO un diseñador industrial. Lo que ves es lo que muestras.
+
+### 👤 ARTÍCULO 2: PROTECCIÓN DE MODELOS HUMANOS
+*   **MANDATO:** Si la imagen contiene una persona (adulto o niño), es INTOCABLE.
+*   **ACCIÓN:** Tu única tarea es recortarlos e integrarlos en el nuevo fondo.
+*   **PROHIBICIONES:** NO cambies sus rasgos faciales, color de piel, pose, expresión ni la ropa que visten.
+
+### 🧹 ARTÍCULO 3: LIMPIEZA DE SET (FUENTES DE LUZ INVISIBLES)
+*   **MANDATO:** La imagen final es un activo de marketing, NO una foto "detrás de cámaras".
+*   **REGLA DE ORO:** La luz debe parecer mágica. NUNCA muestres la fuente de la luz.
+*   **LISTA NEGRA VISUAL (PROHIBIDO DIBUJAR):** Trípodes, patas de stand, softboxes negros, telas reflectoras, paraguas plateados, cables en el suelo, estructura del estudio.
+
+### 🎨 ARTÍCULO 4: CALIDAD VISUAL (SIMULACIÓN 8K)
+*   **MANDATO:** Evitar el "look de IA" (plástico, lavado o suavizado excesivo).
+*   **ACCIÓN:** Fuerza un renderizado con texturas nítidas y micro-contraste realista. La madera debe tener veta; el metal, grano.
+*   **FÍSICA:** Las sombras y reflejos deben obedecer estrictamente a la dirección de la luz solicitada (${lightingStyle === 'sharp' ? 'Dura' : 'Suave'}).
+
+### 📐 ARTÍCULO 5: ENCUADRE Y COMPOSICIÓN
+*   **MANDATO:** Totalidad del sujeto.
+*   **ACCIÓN:** El producto NUNCA debe ser recortado por los bordes del lienzo. Añade "aire" (padding) suficiente alrededor del sujeto para asegurar que se vea completo y respire dentro del formato solicitado.
+
+### 👁️ ARTÍCULO 6: FIDELIDAD DE COLOR
+*   **MANDATO:** Precisión comercial.
+*   **ACCIÓN:** Los colores del producto deben ser idénticos al input. Si el fondo afecta el color del producto (color cast), corrígelo localmente para mantener la fidelidad del SKU.
 
 ---
 
-### 1. Rol: Director de Arte y Retoque Ético (Maestro de la Composición y la Integridad)
-*   **Objetivo Central:** Establecer la arquitectura visual de la imagen y garantizar la integridad del sujeto principal, especialmente si es un modelo humano.
-*   **Reglas Obligatorias:**
-    *   **Integridad de Modelos Humanos (Regla INVIOLABLE):** Si la imagen de origen contiene un modelo humano (adulto o niño), está terminantemente prohibido alterar, modificar, reemplazar o eliminar al modelo. El recorte debe ser perfecto, pero el modelo en sí (su cuerpo, rostro, pose y la ropa que lleva) es INTOCABLE. Tu trabajo se limita a cambiar el fondo y el entorno. CUALQUIER cambio en el modelo es una falla crítica.
-    *   **Composición Fundacional:** Aplica la Regla de los Tercios. El sujeto principal (producto o modelo) debe ser el foco claro y ocupar visualmente entre el 30% y el 60% del encuadre para un equilibrio óptimo.
-    *   **Gestión de Espacio Negativo (Airflow):** El espacio negativo debe ser utilizado estratégicamente para dirigir la mirada al sujeto y proporcionar "aire" para textos publicitarios, especialmente en formatos anchos.
-    *   **Adaptabilidad al Aspecto Ratio (Mandatorio):** La composición debe ser responsiva y dinámica:
-        *   **1:1 (Cuadrado):** Posición central fuerte, ideal para feeds de redes sociales.
-        *   **4:5 (Vertical):** Enfoca en el sujeto, llenando el encuadre de forma natural. Perfecto para posts.
-        *   **16:9 (Widescreen):** Utiliza el formato horizontal para contextualizar. El sujeto debe estar en un tercio lateral, dejando espacio para el ambiente o texto. Ideal para banners.
-    *   **Percepción de Perspectiva:** Mantén una perspectiva realista. El sujeto debe estar correctamente escalado y colocado en el plano del fondo, respetando la línea del horizonte para evitar un aspecto de "recorte flotante".
+### ROLES ACTIVOS PARA ESTA MISIÓN:
 
----
-
-### 2. Rol: Fotógrafo Profesional (Experto en Iluminación y Tono)
-*   **Objetivo Principal:** Recrear la iluminación de un estudio fotográfico de alta gama.
-*   **Gestión de la Luz:** El estilo seleccionado es **${lightingStyleDescription}**. Si es 'Nítida y Enérgica', usa iluminación dura para crear sombras definidas. Si es 'Suave y Uniforme', usa iluminación difusa para minimizar sombras. La luz debe parecer natural en la escena.
-*   **Fotorrealismo:** La dirección y dureza de la luz en el sujeto deben coincidir con la luz del fondo generado.
-
----
-
-### 3. Rol: Experto en Producción y E-commerce (Especialista en Conversión)
-*   **Objetivo Principal:** Entregar un archivo final optimizado para la venta online.
-*   **Nitidez y Detalle:** Aplica un pase de nitidez optimizado para el MÁXIMO NIVEL DE DETALLE Y RESOLUCIÓN. Los bordes y texturas deben ser extremadamente nítidos.
-*   **Fidelidad al Producto:** La máxima prioridad es la fidelidad del color (color accuracy) para minimizar devoluciones. Los colores del producto no deben cambiar.
-*   **Consistencia de Catálogo:** La imagen final debe sentirse profesional y coherente con un catálogo de e-commerce de alta calidad.
+1.  **Director de Arte:** Responsable de la coherencia atmosférica y la integración emocional del fondo.
+2.  **Iluminador Técnico:** Ejecuta el estilo de iluminación: **${lightingStyleDescription}**.
+3.  **Retocador Senior:** Ejecuta el recorte perfecto (masking) y la limpieza absoluta de la escena.
     `;
 };
 
@@ -65,93 +78,107 @@ const getSeparationDescription = (level: number): string => {
     return "lo más separados posible, maximizando la distancia entre ellos dentro del lienzo";
 };
 
+const getBlurDescription = (level: number): string => {
+    if (level <= 0) return "El fondo debe ser completamente nítido (f/16).";
+    if (level < 20) return "Aplica un desenfoque de fondo muy sutil (f/8).";
+    if (level < 40) return "Aplica un desenfoque de fondo suave (f/5.6).";
+    if (level < 60) return "Aplica un desenfoque de fondo moderado, separando sujeto y fondo (f/4).";
+    if (level < 80) return "Aplica un desenfoque de fondo fuerte y cremoso (f/2.8).";
+    return "Aplica un desenfoque de fondo máximo (Bokeh artístico f/1.4), abstrayendo el entorno.";
+};
+
 const buildGenerationPrompt = (config: GenerationConfig, imageCount: number, isVariation: boolean = false): string => {
-    const { backgroundType, backgroundKeywords, aspectRatio, productView, addReflection, separateProducts, productSeparation } = config;
+    const { backgroundType, backgroundKeywords, aspectRatio, productView, addReflection, separateProducts, productSeparation, backgroundBlur } = config;
 
     let backgroundInstruction = '';
     switch (backgroundType) {
         case 'pure_white':
-            backgroundInstruction = 'un fondo sólido y blanco puro (#FFFFFF)';
+            backgroundInstruction = 'un fondo infinito BLANCO PURO (#FFFFFF). Sin viñetas, sin sombras raras en las esquinas. Estudio comercial limpio.';
             break;
         case 'neutral_gray':
-            backgroundInstruction = 'un fondo sólido y gris neutro (#F7F7F7)';
+            backgroundInstruction = 'un fondo infinito GRIS NEUTRO (#F7F7F7). Profesional y sobrio.';
             break;
         case 'themed':
-            backgroundInstruction = `una escena fotorrealista descrita como: "${backgroundKeywords}". El sujeto debe parecer naturalmente integrado en este entorno.`;
+            backgroundInstruction = `un entorno fotorrealista de alta gama: "${backgroundKeywords}". La integración debe ser física (sombras de contacto) y lumínica.`;
             break;
         case 'automatic':
-            backgroundInstruction = `Actúa como un director de arte experto. Analiza en profundidad el producto subido (su estilo, color dominante, forma, materiales y categoría). Basado en este análisis, genera un fondo fotorrealista que sea contextualmente relevante y visualmente impactante. El fondo debe realzar las cualidades del producto, crear una atmósfera aspiracional y ser perfecto para una campaña de e-commerce de alta gama. Por ejemplo, para un reloj de lujo, podrías generar una escena sobre una superficie de mármol oscuro con iluminación dramática. Para unas zapatillas de running, una pista de atletismo al amanecer.`;
+            backgroundInstruction = `un escenario generado por IA (Auto-Director) que maximice el valor comercial del producto detectado. Analiza materiales y colores para proponer el mejor contraste y contexto de lujo.`;
             break;
     }
 
     const steps = [
-        `Analiza la imagen de entrada para determinar si el sujeto principal es un producto aislado o un modelo humano (adulto o niño) presentando un producto.`,
-        `Elimina impecablemente el fondo original, creando un recorte perfecto (enmascaramiento de calidad profesional) del sujeto principal. Si es un modelo humano, presta atención extrema al detalle en el cabello y los bordes de la ropa.`
+        `PASO 1 (ANÁLISIS): Identifica el sujeto principal (producto o modelo).`,
+        `PASO 2 (EXTRACCIÓN): Recorta el sujeto con precisión quirúrgica. Cuidado extremo con cabellos o bordes translúcidos.`
     ];
 
     switch (productView) {
         case 'original':
-            steps.push(`REGLA INVIOLABLE: Mantén la apariencia original del sujeto (producto y/o modelo) sin ninguna modificación en su color, textura, forma, logos o detalles. Presenta el sujeto exactamente como está en la imagen de origen. La fidelidad al 100% es crítica.`);
+            steps.push(`PASO 3 (INTEGRIDAD): ¡ALERTA ROJA! Mantén el sujeto 100% idéntico al original píxel a píxel. NO modifiques colores, tramas ni logotipos.`);
             break;
         case 'enhanced':
-            steps.push(`REGLA DE ORO: El producto y/o modelo deben permanecer 100% idénticos al original. NO se permite NINGUNA alteración de color, textura, forma, logos o cualquier detalle intrínseco. Tu misión es presentar el mismo sujeto intacto, pero explorando una composición o un ángulo de cámara ligeramente más dinámico y atractivo. Imagina que tomas la foto desde una perspectiva sutilmente diferente para darle un mayor impacto visual, sin modificar el producto en sí.`);
+            steps.push(`PASO 3 (MEJORA): Mantén la geometría y logos intactos, pero puedes mejorar sutilmente el contraste local y la viveza de los materiales para un look más "publicitario".`);
             break;
     }
 
     if (imageCount > 1) {
-        let arrangementInstruction = `Organiza todos los sujetos recortados en una composición única y cohesiva. Asegúrate de que la escala, la perspectiva y la iluminación entre ellos sean consistentes y realistas. TODOS deben aparecer juntos en la imagen final.`;
+        let arrangementInstruction = `PASO 4 (COMPOSICIÓN MÚLTIPLE): Organiza todos los sujetos en el lienzo.`;
         if (separateProducts && (backgroundType === 'pure_white' || backgroundType === 'neutral_gray')) {
             const separationText = getSeparationDescription(productSeparation);
-            arrangementInstruction += ` CRÍTICO: Los productos deben colocarse por separado en el lienzo, sin tocarse ni superponerse, ${separationText}.`;
+            arrangementInstruction += ` MODO GRID: Coloca los productos ${separationText}. Asegura que NO se superpongan.`;
+        } else {
+            arrangementInstruction += ` Crea una composición de grupo natural y cohesiva.`;
         }
         steps.push(arrangementInstruction);
     }
 
-    steps.push(`Coloca el/los sujeto(s) resultante(s) en un nuevo fondo. El fondo debe ser: ${backgroundInstruction}.`);
+    steps.push(`PASO 5 (GENERACIÓN DE FONDO): Coloca el resultado en ${backgroundInstruction}.`);
+    
+    if ((backgroundType === 'themed' || backgroundType === 'automatic') && backgroundBlur > 0) {
+        steps.push(`PASO 6 (ÓPTICA): ${getBlurDescription(backgroundBlur)}`);
+    }
 
     if (addReflection && (backgroundType === 'pure_white' || backgroundType === 'neutral_gray')) {
-        steps.push(`Añade un reflejo sutil y realista del sujeto en la superficie para mejorar la sensación de profundidad.`);
+        steps.push(`PASO EXTRA: Genera un reflejo de suelo sutil y elegante (efecto espejo pulido).`);
     }
     
     let aspectRatioDetails = '';
     switch(aspectRatio) {
-      case '1:1': 
-        aspectRatioDetails = 'La imagen debe ser un cuadrado perfecto.'; 
-        break;
-      case '4:5':
-        aspectRatioDetails = 'La imagen debe ser un rectángulo vertical.';
-        break;
-      case '16:9': 
-        aspectRatioDetails = 'La imagen debe ser un rectángulo horizontal.'; 
-        break;
+      case '1:1': aspectRatioDetails = 'Cuadrado (1:1)'; break;
+      case '4:5': aspectRatioDetails = 'Vertical (4:5)'; break;
+      case '16:9': aspectRatioDetails = 'Horizontal (16:9)'; break;
     }
     
-    const resolutionInstruction = `REQUISITO DE CALIDAD CRÍTICO: Genera la imagen con el MÁXIMO NIVEL DE DETALLE Y RESOLUCIÓN POSIBLE, apuntando a una resolución nativa de 1536px en su lado más largo.`;
-        
-    steps.push(`${resolutionInstruction} REQUISITO DE FORMATO MANDATORIO: La imagen debe adherirse estricta e impecablemente a la relación de aspecto ${aspectRatio} (${aspectRatioDetails}). No se aceptarán desviaciones. El sujeto principal debe ser el protagonista indiscutible.`);
+    steps.push(`PASO CRÍTICO (ENCUADRE): Ajusta la cámara para cumplir el formato ${aspectRatioDetails}. IMPORTANTE: Deja "aire" (padding) alrededor del producto. NO cortes el producto en los bordes.`);
 
-
-    const numberedSteps = steps.map((step, index) => `${index + 1}. ${step}`).join('\n');
+    const numberedSteps = steps.map((step) => `${step}`).join('\n');
     
     const roleInstructions = getRoleInstructions(config);
 
+    // SE AÑADE UN BLOQUE DE NEGATIVE PROMPT EXPLÍCITO AL FINAL
     const basePrompt = `
       ${roleInstructions}
 
       ---
-      **MISIÓN ACTUAL:**
-      **DIRECTIVA CRÍTICA SOBRE MODELOS HUMANOS Y PRODUCTOS:** Tu prioridad absoluta es preservar el producto y/o modelo 100% intacto. NO alteres su apariencia, ropa, pose, color o detalles. Tu única misión es cambiar el fondo y ajustar la iluminación general de la escena.
+      **EJECUCIÓN DE MISIÓN (PRIORIDAD: CALIDAD COMERCIAL):**
       
-      Ahora, aplicando rigurosamente todos los roles y directrices anteriores, ejecuta la siguiente misión paso a paso:
-
-      **Pasos a Seguir:**
+      Sigue esta secuencia estricta:
       ${numberedSteps}
+
+      ---
+      ⛔ NEGATIVE PROMPT (EXCLUSIONES VISUALES ESTRICTAS):
+      La imagen final NO DEBE CONTENER BAJO NINGUNA CIRCUNSTANCIA:
+      - Equipos de iluminación visibles (softboxes, paraguas, reflectores, aros de luz).
+      - Estructuras de estudio (trípodes, soportes C-stand, pinzas, cables).
+      - Cámaras, lentes o fotógrafos reflejados.
+      - Bordes de la mesa de bodegón o fin del rollo de papel.
+      
+      La luz debe emanar de fuentes INVISIBLES.
     `;
 
     if (isVariation) {
         return `
-        **GENERAR UNA VARIANTE CREATIVA.**
-        Tu objetivo es crear una nueva versión, claramente diferente, de la siguiente solicitud. Explora una composición, ángulo o detalle ambiental diferente para proporcionar una alternativa única. Los dos resultados deben ser totalmente distintos, pero AMBOS deben seguir la regla inviolable sobre no alterar productos o modelos humanos si están presentes.
+        **VARIANTE CREATIVA SOLICITADA**
+        Manteniendo TODAS las Reglas de Oro (especialmente Integridad del Producto y Limpieza de Set), genera una versión alternativa con una composición o ángulo de luz ligeramente diferente.
         ---
         ${basePrompt}
         `
@@ -162,6 +189,7 @@ const buildGenerationPrompt = (config: GenerationConfig, imageCount: number, isV
 
 export const generateProductImage = async (images: UploadedFile[], config: GenerationConfig): Promise<string[]> => {
     try {
+        const ai = getClient();
         const imageParts = images.map(img => base64ToGenerativePart(img.base64, img.type));
 
         const generate = async (isVariation: boolean = false): Promise<string> => {
@@ -178,7 +206,7 @@ export const generateProductImage = async (images: UploadedFile[], config: Gener
             if (firstPart && firstPart.inlineData) {
                 return firstPart.inlineData.data;
             }
-            throw new Error(`El modelo no devolvió una imagen para la ${isVariation ? 'segunda' : 'primera'} opción. La respuesta puede haber sido bloqueada.`);
+            throw new Error(`El modelo no devolvió imagen. Posible bloqueo de seguridad.`);
         }
 
         const promises = [generate(false), generate(true)];
@@ -190,7 +218,7 @@ export const generateProductImage = async (images: UploadedFile[], config: Gener
 
         if (successfulImages.length === 0) {
             const firstRejection = results.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined;
-            const errorMessage = firstRejection?.reason?.message || "Ambas generaciones de imágenes fallaron. La respuesta pudo haber sido bloqueada por filtros de seguridad.";
+            const errorMessage = firstRejection?.reason?.message || "Error en generación. Intenta reformular el prompt.";
             throw new Error(errorMessage);
         }
 
@@ -198,35 +226,35 @@ export const generateProductImage = async (images: UploadedFile[], config: Gener
         
     } catch (error) {
         console.error("Error generating product image:", error);
-        throw error instanceof Error ? error : new Error("Failed to generate image. Please check your prompt or API key.");
+        throw error instanceof Error ? error : new Error("Fallo en el servicio de IA.");
     }
 };
 
 export const refineProductImage = async (baseImage: UploadedFile, command: string, config: GenerationConfig): Promise<string> => {
     if (!command.trim()) {
-        throw new Error("Refinement command cannot be empty.");
+        throw new Error("El comando de refinamiento está vacío.");
     }
 
     try {
-        const backgroundDescription = config.backgroundType === 'themed' ? `temático descrito como "${config.backgroundKeywords}"` : config.backgroundType.replace(/_/g, ' ');
-        const lightingDescription = config.lightingStyle === 'sharp' ? 'Nítida y Enérgica' : 'Suave y Uniforme';
+        const ai = getClient();
+        const lightingDesc = config.lightingStyle === 'sharp' ? 'Dura/Nítida' : 'Suave/Difusa';
 
         const prompt = `
-            Eres un experto Editor de Fotos IA.
-            Tu tarea es aplicar un refinamiento específico a una fotografía de producto generada previamente, basándote en el comando del usuario.
+            Eres un Editor Senior de Flux IA. Tu misión es refinar una imagen existente siguiendo ESTRICTAMENTE la Constitución de Reglas de Oro.
 
-            **CONTEXTO DE LA IMAGEN ORIGINAL (MANDATORIO):**
-            *   **Tipo de Fondo:** ${backgroundDescription}
-            *   **Estilo de Iluminación:** ${lightingDescription}
-            *   **Relación de Aspecto:** ${config.aspectRatio}
+            **TU OBJETIVO:**
+            Ejecutar el comando del usuario: "${command}"
 
-            Tu refinamiento debe respetar este contexto. Realiza un ajuste sutil y profesional que se integre de forma natural con la estética existente. No alteres drásticamente el estilo, la composición o los colores.
+            **TUS RESTRICCIONES (CONSTITUCIÓN):**
+            1.  **INTEGRIDAD:** El producto y/o modelo son SAGRADOS. No cambies sus colores, formas o texturas bajo ninguna circunstancia. Solo edita la luz, el ambiente o el fondo.
+            2.  **LIMPIEZA (CRÍTICO):** La imagen DEBE permanecer limpia. NO agregues trípodes, luces, softboxes ni reflectores aunque edites la iluminación. La fuente de luz es invisible.
+            3.  **CALIDAD:** Mantén la resolución visual y el realismo de las texturas.
 
-            **COMANDO DEL USUARIO A EJECUTAR:**
-            "${command}"
-
-            **REGLA CRÍTICA INVIOLABLE:**
-            El producto y/o modelo humano en la imagen son INTOCABLES. NO los alteres de ninguna manera (color, forma, textura, etc.). Tu tarea es aplicar los cambios al entorno, la iluminación general o la atmósfera, pero el sujeto principal debe permanecer 100% idéntico al original.
+            **CONTEXTO TÉCNICO:**
+            Estilo de luz actual: ${lightingDesc}.
+            Formato: ${config.aspectRatio}.
+            
+            Procede con la edición manteniendo la esencia de la imagen original.
         `;
 
         const imagePart = base64ToGenerativePart(baseImage.base64, baseImage.type);
@@ -243,11 +271,51 @@ export const refineProductImage = async (baseImage: UploadedFile, command: strin
         if (firstPart && firstPart.inlineData) {
             return firstPart.inlineData.data;
         } else {
-            throw new Error("No se generó ninguna imagen para el refinamiento. La respuesta puede haber sido bloqueada.");
+            throw new Error("No se generó imagen de refinamiento.");
         }
 
     } catch (error) {
         console.error("Error refining product image:", error);
-        throw new Error("No se pudo refinar la imagen. Por favor, intenta con un comando diferente.");
+        throw new Error("No se pudo refinar la imagen.");
+    }
+};
+
+export const enhancePrompt = async (userText: string, type: 'background' | 'refinement' = 'background'): Promise<string> => {
+    try {
+        const ai = getClient();
+        let systemInstruction = '';
+        
+        if (type === 'background') {
+            systemInstruction = `
+            Actúa como un Director de Arte de E-commerce.
+            Mejora el siguiente concepto de fondo breve para convertirlo en un prompt detallado y lujoso.
+            INPUT: "${userText}"
+            REGLAS:
+            - Describe materiales, iluminación y atmósfera.
+            - Manténlo fotorrealista.
+            - NO describas el producto, solo el entorno.
+            - Responde SOLO con el prompt mejorado en español.
+            `;
+        } else {
+            systemInstruction = `
+            Actúa como un Técnico de Imagen Digital.
+            Traduce la solicitud del usuario a lenguaje técnico fotográfico preciso.
+            INPUT: "${userText}"
+            EJEMPLOS:
+            "más luz" -> "Aumentar exposición global +0.5 pasos y abrir sombras."
+            "fondo más borroso" -> "Reducir profundidad de campo a f/2.8 para mayor bokeh."
+            Responde SOLO con la instrucción técnica.
+            `;
+        }
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: { parts: [{ text: systemInstruction }] },
+        });
+
+        return response.text?.trim() || userText;
+    } catch (error) {
+        console.error("Error enhancing prompt:", error);
+        return userText;
     }
 };
